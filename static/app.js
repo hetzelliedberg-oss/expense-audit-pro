@@ -122,6 +122,7 @@ async function uploadBatchFiles(fileList) {
 }
 
 function startBatchPolling(batchId, totalFiles) {
+  let lastProcessed = 0;
   if (batchPollInterval) clearInterval(batchPollInterval);
 
   batchPollInterval = setInterval(async () => {
@@ -137,6 +138,12 @@ function startBatchPolling(batchId, totalFiles) {
       document.getElementById("batchProgressPercent").innerText = `${pct}%`;
       document.getElementById("batchCountStats").innerText = `${done} / ${data.total_files} ไฟล์ (สำเร็จ: ${data.processed_files}, ผิดพลาด: ${data.failed_files})`;
 
+      if (data.processed_files > lastProcessed) {
+        lastProcessed = data.processed_files;
+        loadKPIStats();
+        reloadTransactions();
+      }
+
       if (data.is_finished || done >= data.total_files) {
         clearInterval(batchPollInterval);
         batchPollInterval = null;
@@ -148,7 +155,7 @@ function startBatchPolling(batchId, totalFiles) {
           document.getElementById("batchProgressContainer").classList.add("hidden");
           // Reset file input
           document.getElementById("batchFileInput").value = "";
-        }, 3500);
+        }, 2000);
 
         // Refresh all components
         loadKPIStats();
@@ -159,7 +166,7 @@ function startBatchPolling(batchId, totalFiles) {
     } catch (e) {
       console.error("Polling error:", e);
     }
-  }, 1000);
+  }, 800);
 }
 
 // ----------------------------------------------------
