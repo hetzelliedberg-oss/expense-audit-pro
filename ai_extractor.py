@@ -15,6 +15,13 @@ try:
 except ImportError:
     HAS_GENAI = False
 
+try:
+    from rapidocr_onnxruntime import RapidOCR
+    local_ocr_engine = RapidOCR()
+    HAS_LOCAL_OCR = True
+except Exception as e:
+    HAS_LOCAL_OCR = False
+
 SYSTEM_INSTRUCTION = """
 คุณคือผู้ตรวจสอบบัญชีและวิเคราะห์เอกสารทางการเงินระดับมืออาชีพ (Professional Financial Auditor & Fact-based OCR Engine)
 เป้าหมายของคุณคือ: "อ่านและสกัดข้อเท็จจริง (FACTS ONLY) 100% จากภาพเอกสารที่อัปโหลดเท่านั้น ห้ามแต่งเติมหรือสมมุติตัวเลขเด็ดขาด"
@@ -173,3 +180,169 @@ def extract_with_gemini(image_path: str, api_key: str = None) -> dict:
             time.sleep(1)
 
     raise RuntimeError(f"การประมวลผลด้วย Gemini API ล้มเหลว: {str(last_err)}")
+
+def extract_with_local_ocr(image_path: str) -> dict:
+    """Extracts factual transaction data locally using RapidOCR without any external API."""
+    if not HAS_LOCAL_OCR:
+        raise RuntimeError("RapidOCR engine is not available.")
+
+    res, _ = local_ocr_engine(image_path)
+    if not res:
+        now_dt = datetime.now()
+        return {
+            "doc_type": "unrecognized",
+            "is_multiple_transactions": False,
+            "transactions": [{
+                "transaction_date": now_dt.strftime("%Y-%m-%d"),
+                "transaction_time": now_dt.strftime("%H:%M:%S"),
+                "transaction_datetime": now_dt.isoformat(),
+                "type": "expense",
+                "amount": 0.0,
+                "fee": 0.0,
+                "vat": 0.0,
+                "total_amount": 0.0,
+                "category": "ทั่วไป",
+                "subcategory": "",
+                "payment_source": "ไม่ระบุ",
+                "sender_name": "",
+                "sender_account": "",
+                "payee_name": "ไม่พบข้อความในภาพ",
+                "payee_account": "",
+                "ref_number": "",
+                "items": [],
+                "notes": "ไม่สามารถสกัดตัวหนังสือหรือยอดเงินจากภาพได้",
+                "confidence_score": 0.0,
+                "raw_ai_response": "RapidOCR: No text detected"
+            }]
+        }
+
+    lines = [r[1].strip() for r in res]
+    full_text = " \n ".join(lines)
+    low_text = full_text.lower()
+
+    # 1. Identify Bank / Financial Institution
+    bank = "ธนาคารทั่วไป"
+    if any(k in low_text for k in ["krungthai", "กรุงไทย", "ktb"]):
+        bank = "กรุงไทย (KTB)"
+    elif any(k in low_text for k in ["k+", "kbank", "กสิกร"]):
+        bank = "กสิกรไทย (KBank)"
+    elif any(k in low_text for k in ["scb", "ไทยพาณิชย์"]):
+        bank = "ไทยพาณิชย์ (SCB)"
+    elif any(k in low_text for k in ["ttb", "ทีทีบี", "thanachart"]):
+        bank = "ทีทีบี (ttb)"
+    elif any(k in low_text for k in ["bangkok bank", "กรุงเทพ", "bbl"]):
+        bank = "กรุงเทพ (BBL)"
+    elif any(k in low_text for k in ["gsb", "ออมสิน"]):
+        bank = "ออมสิน (GSB)"
+    elif any(k in low_text for k in ["bay", "กรุงศรี"]):
+        bank = "กรุงศรี (BAY)"
+    elif any(k in low_text for k in ["promptpay", "พร้อมเพย์"]):
+        bank = "พร้อมเพย์ (PromptPay)"
+    elif any(k in low_text for k in ["truemoney", "ทรูมันนี่"]):
+        bank = "TrueMoney"
+
+    # 2. Extract Reference Number (15+ alphanumeric characters)
+    ref = ""
+    for line in lines:
+        m_ref = re.search(r'([A-Z0-9]{15,})', line)
+        if m_ref and not re.match(r'^[X\-]+$', m_ref.group(1)):
+            ref = m_ref.group(1)
+            break
+
+    # 3. Extract Amounts (Find decimals with 2 places)
+    amounts = []
+    for line in lines:
+        matches = re.findall(r'(\d{1,3}(?:,\d{3})*\.\d{2})', line)
+        for m in matches:
+            val = float(m.replace(",", ""))
+            amounts.append(val)
+
+    main_amount = 0.0
+    fee = 0.0
+    if amounts:
+        non_zero = [a for a in amounts if a > 0]
+        if non_zero:
+            main_amount = non_zero[0]
+            if len(non_zero) > 1 and non_zero[-1] < main_amount:
+                fee = non_zero[-1]
+
+    # 4. Extract Date & Time
+    th_months = {
+        'ม.ค': 1, 'ก.พ': 2, 'มี.ค': 3, 'เม.ย': 4, 'พ.ค': 5, 'มิ.ย': 6,
+        'ก.ค': 7, 'ส.ค': 8, 'ก.ย': 9, 'ต.ค': 10, 'พ.ย': 11, 'ธ.ค': 12
+    }
+    m_dt = re.search(r'(\d{1,2})\s*([ก-๙a-zA-Z\.]+)\s*(\d{2,4}).*?(\d{1,2}:\d{2}(?::\d{2})?)', full_text)
+    if m_dt:
+        day = int(m_dt.group(1))
+        m_str = m_dt.group(2)
+        yr_raw = int(m_dt.group(3))
+        time_part = m_dt.group(4)
+        if len(time_part.split(':')) == 2:
+            time_part += ':00'
+        if yr_raw > 2500:
+            year = yr_raw - 543
+        elif yr_raw >= 43 and yr_raw <= 99:
+            year = 2500 + yr_raw - 543
+        else:
+            year = 2000 + yr_raw
+
+        month = 1
+        for k, v in th_months.items():
+            if k in m_str or m_str in k:
+                month = v
+                break
+        date_str = f"{year:04d}-{month:02d}-{day:02d}"
+        time_str = time_part
+    else:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        time_str = datetime.now().strftime("%H:%M:%S")
+
+    # 5. Extract Accounts
+    accounts = []
+    for line in lines:
+        m_acc = re.search(r'([xX\d\-]{8,})', line)
+        if m_acc and ('x' in m_acc.group(1).lower() or '-' in m_acc.group(1)):
+            accounts.append(m_acc.group(1))
+
+    sender_acc = accounts[0] if len(accounts) > 0 else ""
+    payee_acc = accounts[1] if len(accounts) > 1 else ""
+
+    # Payee Display
+    payee_disp = f"โอนเข้าบัญชี {payee_acc}" if payee_acc else f"โอนเงิน ({bank})"
+    for idx, l in enumerate(lines):
+        if "ไปยัง" in l or "to" in l.lower():
+            if idx + 1 < len(lines):
+                cand = lines[idx + 1].strip()
+                if not re.search(r'[xX\d\-]{8,}', cand):
+                    payee_disp = cand
+
+    tx = {
+        "doc_type": "bank_slip",
+        "transaction_date": date_str,
+        "transaction_time": time_str,
+        "transaction_datetime": f"{date_str}T{time_str}",
+        "type": "expense",
+        "amount": main_amount,
+        "fee": fee,
+        "vat": 0.0,
+        "total_amount": main_amount,
+        "category": "โอนเงินและชำระเงิน",
+        "subcategory": "โอนเงินบุคคล",
+        "payment_source": bank,
+        "sender_name": "ผู้โอนเงิน",
+        "sender_account": sender_acc,
+        "payee_name": payee_disp,
+        "payee_account": payee_acc,
+        "ref_number": ref,
+        "items": [],
+        "notes": f"สแกนอัตโนมัติจากสลิป {bank} Ref: {ref}" if ref else f"สแกนอัตโนมัติจากสลิป {bank}",
+        "confidence_score": 0.95,
+        "raw_ai_response": full_text
+    }
+
+    return {
+        "doc_type": "bank_slip",
+        "is_multiple_transactions": False,
+        "transactions": [tx]
+    }
+
