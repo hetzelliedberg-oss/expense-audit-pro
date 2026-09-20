@@ -21,52 +21,61 @@ logger = logging.getLogger("QueueManager")
 executor = ThreadPoolExecutor(max_workers=MAX_WORKER_THREADS)
 
 def process_single_image(batch_id: str, file_name: str, file_path: str):
-    """Processes a single uploaded document in the background."""
+    """Processes a single uploaded document in the background with real factual extraction."""
     try:
-        # Step 1: Compute File Hash
+        # Step 1: Compute File Hash for exact duplicate image detection
         f_hash = compute_file_hash(file_path)
 
-        # Step 2: AI OCR & Multimodal Extraction (Gemini)
-        extracted = extract_with_gemini(file_path)
+        # Step 2: Real Gemini AI Multimodal Vision Extraction
+        extracted_result = extract_with_gemini(file_path)
+        tx_list = extracted_result.get("transactions", [])
+        
+        if not tx_list:
+            logger.warning(f"Batch {batch_id}: No transactions detected in {file_name}")
+            update_batch_progress(batch_id, processed_increment=1)
+            return
 
-        # Step 3: Package Data
-        tx_data = {
-            "batch_id": batch_id,
-            "file_name": file_name,
-            "file_path": file_path,
-            "file_hash": f_hash,
-            "doc_type": extracted.get("doc_type", "bank_slip"),
-            "transaction_date": extracted.get("transaction_date", ""),
-            "transaction_time": extracted.get("transaction_time", ""),
-            "transaction_datetime": extracted.get("transaction_datetime", ""),
-            "type": extracted.get("type", "expense"),
-            "amount": float(extracted.get("amount", 0.0)),
-            "fee": float(extracted.get("fee", 0.0)),
-            "vat": float(extracted.get("vat", 0.0)),
-            "total_amount": float(extracted.get("total_amount", 0.0)),
-            "category": extracted.get("category", "ทั่วไป"),
-            "subcategory": extracted.get("subcategory", ""),
-            "payment_source": extracted.get("payment_source", ""),
-            "sender_name": extracted.get("sender_name", ""),
-            "sender_account": extracted.get("sender_account", ""),
-            "payee_name": extracted.get("payee_name", ""),
-            "payee_account": extracted.get("payee_account", ""),
-            "ref_number": extracted.get("ref_number", ""),
-            "items": extracted.get("items", []),
-            "confidence_score": float(extracted.get("confidence_score", 1.0)),
-            "notes": extracted.get("notes", ""),
-            "raw_ai_response": extracted.get("raw_ai_response", "")
-        }
+        inserted_count = 0
+        for tx in tx_list:
+            # Package Data Factually
+            tx_data = {
+                "batch_id": batch_id,
+                "file_name": file_name,
+                "file_path": file_path,
+                "file_hash": f_hash,
+                "doc_type": tx.get("doc_type", extracted_result.get("doc_type", "bank_slip")),
+                "transaction_date": tx.get("transaction_date", ""),
+                "transaction_time": tx.get("transaction_time", ""),
+                "transaction_datetime": tx.get("transaction_datetime", ""),
+                "type": tx.get("type", "expense"),
+                "amount": float(tx.get("amount", 0.0)),
+                "fee": float(tx.get("fee", 0.0)),
+                "vat": float(tx.get("vat", 0.0)),
+                "total_amount": float(tx.get("total_amount", 0.0)),
+                "category": tx.get("category", "ทั่วไป"),
+                "subcategory": tx.get("subcategory", ""),
+                "payment_source": tx.get("payment_source", ""),
+                "sender_name": tx.get("sender_name", ""),
+                "sender_account": tx.get("sender_account", ""),
+                "payee_name": tx.get("payee_name", ""),
+                "payee_account": tx.get("payee_account", ""),
+                "ref_number": tx.get("ref_number", ""),
+                "items": tx.get("items", []),
+                "confidence_score": float(tx.get("confidence_score", 1.0)),
+                "notes": tx.get("notes", ""),
+                "raw_ai_response": tx.get("raw_ai_response", "")
+            }
 
-        # Step 4: Audit & Recheck (Duplicate detection, math check, reconciliation)
-        audited_tx = audit_and_recheck_transaction(tx_data)
+            # Step 3: Real Audit & Recheck (Exact duplicate, fuzzy match, arithmetic check)
+            audited_tx = audit_and_recheck_transaction(tx_data)
 
-        # Step 5: Insert into database
-        trans_id = insert_transaction(audited_tx)
+            # Step 4: Insert transaction into database
+            trans_id = insert_transaction(audited_tx)
+            inserted_count += 1
+            logger.info(f"Batch {batch_id}: Processed {file_name} -> Tx #{trans_id} ({audited_tx['audit_status']})")
 
-        # Step 6: Update batch progress
+        # Step 5: Update batch progress
         update_batch_progress(batch_id, processed_increment=1)
-        logger.info(f"Batch {batch_id}: Successfully processed {file_name} -> Tx #{trans_id} (Audit: {audited_tx['audit_status']})")
 
     except Exception as e:
         logger.error(f"Batch {batch_id}: Error processing {file_name}: {str(e)}", exc_info=True)

@@ -56,10 +56,6 @@
       </div>
 
       <div class="flex items-center space-x-2 sm:space-x-3">
-        <button id="btnSeedDemo" onclick="seedDemoTransactions()" class="px-3 py-2 text-xs sm:text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition flex items-center space-x-1 shadow-sm" title="ใส่ข้อมูลสลิปจำลองสำหรับทดสอบทันที">
-          <i data-lucide="sparkles" class="w-4 h-4 text-indigo-600"></i>
-          <span class="hidden sm:inline">ใส่ข้อมูลทดสอบ</span>
-        </button>
 
         <button id="btnRecheck" onclick="runGlobalRecheck()" class="px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition flex items-center space-x-1 shadow-sm">
           <i data-lucide="refresh-cw" class="w-4 h-4 text-indigo-600"></i>
@@ -158,6 +154,20 @@
           </label>
           <input id="batchFileInput" type="file" multiple accept="image/*,application/pdf" class="hidden" onchange="handleFileSelect(event)">
         </div>
+      </div>
+
+      <!-- Real Fact Notice / API Key Notice -->
+      <div id="apiKeyMissingAlert" class="hidden mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="key-round" class="w-5 h-5 text-amber-600 flex-shrink-0"></i>
+          <div>
+            <strong>ต้องการ Gemini API Key เพื่อประมวลผลข้อเท็จจริง (100% Facts Only):</strong>
+            <p class="text-amber-700 mt-0.5">ระบบนี้ถอดข้อมูลจริงจากสลิปและบิลโดยตรง ไม่มีการ Mock หรือสร้างข้อมูลจำลองใดๆ กรุณากรอก API Key ก่อนอัปโหลดรูป</p>
+          </div>
+        </div>
+        <button onclick="openSettingsModal()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-sm whitespace-nowrap ml-3">
+          ตั้งค่า API Key ทันที
+        </button>
       </div>
 
       <!-- Drag and Drop Dropzone -->

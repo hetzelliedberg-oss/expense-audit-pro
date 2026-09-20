@@ -81,6 +81,13 @@ async function uploadBatchFiles(fileList) {
   const files = Array.from(fileList);
   if (files.length === 0) return;
 
+  const hasKey = await checkSettings();
+  if (!hasKey) {
+    alert("กรุณาระบุ Google Gemini API Key ที่เมนู 'ตั้งค่า' ก่อนเริ่มอัปโหลด เพื่อให้ระบบดึงข้อมูลจริง (Facts Only) จากภาพสลิปครับ");
+    openSettingsModal();
+    return;
+  }
+
   const progressContainer = document.getElementById("batchProgressContainer");
   const progressBar = document.getElementById("batchProgressBar");
   const progressLabel = document.getElementById("batchProgressLabel");
@@ -703,22 +710,27 @@ async function checkSettings() {
     const res = await fetch("/api/settings");
     const data = await res.json();
     const stEl = document.getElementById("apiKeyStatus");
+    const alertBox = document.getElementById("apiKeyMissingAlert");
     if (data.has_api_key) {
-      stEl.innerText = `สถานะ: มีการตั้งค่า Key แล้ว (${data.masked_key})`;
+      stEl.innerText = `สถานะ: มีการตั้งค่า Key แล้ว (${data.masked_key}) - พร้อมอ่านภาพจริง 100%`;
       stEl.className = "text-xs mt-1 text-emerald-600 font-semibold";
+      if (alertBox) alertBox.classList.add("hidden");
     } else {
-      stEl.innerText = "สถานะ: ยังไม่มี Key (กำลังใช้ Mock Engine จำลองข้อมูล)";
+      stEl.innerText = "สถานะ: ยังไม่มี Key (กรุณากรอก API Key เพื่อเริ่มใช้งานจริง)";
       stEl.className = "text-xs mt-1 text-amber-600 font-semibold";
+      if (alertBox) alertBox.classList.remove("hidden");
     }
+    return data.has_api_key;
   } catch (e) {
     console.error("Settings check failed:", e);
+    return false;
   }
 }
 
 async function saveApiKey() {
   const key = document.getElementById("inputApiKey").value.trim();
   if (!key) {
-    alert("กรุณากรอก API Key");
+    alert("กรุณากรอก Gemini API Key");
     return;
   }
   try {
@@ -728,7 +740,7 @@ async function saveApiKey() {
       body: JSON.stringify({ api_key: key })
     });
     if (res.ok) {
-      alert("บันทึก Gemini API Key เรียบร้อยแล้ว!");
+      alert("บันทึก Google Gemini API Key เรียบร้อยแล้ว!\nระบบพร้อมสแกนและ Audit ข้อมูลจริงจากสลิปของคุณแล้วครับ");
       closeSettingsModal();
       checkSettings();
     }
@@ -755,29 +767,6 @@ function escapeHtml(text) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-}
-
-async function seedDemoTransactions() {
-  const btn = document.getElementById("btnSeedDemo");
-  const origHtml = btn.innerHTML;
-  btn.innerHTML = `<span class="inline-block w-3.5 h-3.5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></span> <span>กำลังใส่ข้อมูล...</span>`;
-  btn.disabled = true;
-
-  try {
-    const res = await fetch("/api/seed-demo", { method: "POST" });
-    const data = await res.json();
-    reloadTransactions();
-    loadKPIStats();
-    loadDailyBreakdown();
-    loadMonthlyAndCharts();
-    alert("ใส่ข้อมูลจำลองเรียบร้อยแล้ว!\nระบบได้จำลองสลิปปกติ สลิปซ้ำ และบิลค่าน้ำมัน ให้คุณได้ทดลองระบบ Audit และการแยกหมวดหมู่ทันที");
-  } catch (e) {
-    alert("เกิดข้อผิดพลาด: " + e.message);
-  } finally {
-    btn.innerHTML = origHtml;
-    btn.disabled = false;
-    if (window.lucide) lucide.createIcons();
-  }
 }
 
 async function clearAllTransactions() {

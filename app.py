@@ -259,62 +259,7 @@ def save_settings():
         os.environ["GEMINI_API_KEY"] = key
     return jsonify({"status": "saved", "message": "Settings updated successfully."})
 
-@app.route("/api/seed-demo", methods=["POST"])
-def seed_demo_data():
-    """Seeds realistic Thai transaction data for instant dashboard demonstration."""
-    from datetime import datetime, timedelta
-    now = datetime.now()
-    sample_data = [
-        {
-            "doc_type": "bank_slip", "transaction_date": (now - timedelta(days=0)).strftime("%Y-%m-%d"),
-            "transaction_time": "12:15:30", "type": "expense", "amount": 350.0, "fee": 0.0,
-            "category": "อาหารและเครื่องดื่ม", "subcategory": "มื้อเที่ยง", "payment_source": "กสิกรไทย (KBank)",
-            "payee_name": "ร้านส้มตำเด้อ สาขาทองหล่อ", "sender_name": "คุณผู้ใช้",
-            "ref_number": f"2026{now.strftime('%m%d')}KB01", "notes": "ทานข้าวเที่ยงกับทีมงาน"
-        },
-        {
-            "doc_type": "receipt_invoice", "transaction_date": (now - timedelta(days=0)).strftime("%Y-%m-%d"),
-            "transaction_time": "08:45:10", "type": "expense", "amount": 1400.0, "fee": 0.0,
-            "category": "เดินทางและยานพาหนะ", "subcategory": "ค่าน้ำมัน", "payment_source": "บัตรเครดิต KTC",
-            "payee_name": "PTT Station สาขาวิภาวดี", "sender_name": "คุณผู้ใช้",
-            "ref_number": f"PTT{now.strftime('%m%d')}991", "notes": "เติมน้ำมันเต็มถัง แก๊สโซฮอล์ 95"
-        },
-        {
-            "doc_type": "bank_slip", "transaction_date": (now - timedelta(days=1)).strftime("%Y-%m-%d"),
-            "transaction_time": "18:20:00", "type": "expense", "amount": 289.0, "fee": 0.0,
-            "category": "ช้อปปิ้งและของใช้", "subcategory": "ของใช้ในบ้าน", "payment_source": "ไทยพาณิชย์ (SCB)",
-            "payee_name": "7-Eleven สาขาพญาไท", "sender_name": "คุณผู้ใช้",
-            "ref_number": f"2026{now.strftime('%m%d')}SCB02", "notes": "ซื้อเครื่องดื่มและของใช้ส่วนตัว"
-        },
-        {
-            "doc_type": "bank_slip", "transaction_date": (now - timedelta(days=1)).strftime("%Y-%m-%d"),
-            "transaction_time": "19:05:00", "type": "expense", "amount": 289.0, "fee": 0.0,
-            "category": "ช้อปปิ้งและของใช้", "subcategory": "ของใช้ในบ้าน", "payment_source": "ไทยพาณิชย์ (SCB)",
-            "payee_name": "7-Eleven สาขาพญาไท", "sender_name": "คุณผู้ใช้",
-            "ref_number": f"2026{now.strftime('%m%d')}SCB02",  # Intentionally duplicate Ref
-            "notes": "สลิปซ้ำ (จำลองสถานการณ์ถ่ายรูปซ้ำ 2 ครั้ง)"
-        },
-        {
-            "doc_type": "receipt_invoice", "transaction_date": (now - timedelta(days=2)).strftime("%Y-%m-%d"),
-            "transaction_time": "10:00:00", "type": "expense", "amount": 2450.0, "fee": 0.0,
-            "category": "สาธารณูปโภคและบิล", "subcategory": "ค่าไฟฟ้า", "payment_source": "กรุงไทย (KTB)",
-            "payee_name": "การไฟฟ้านครหลวง (MEA)", "sender_name": "คุณผู้ใช้",
-            "ref_number": f"MEA{now.strftime('%m%d')}08", "notes": "ชำระค่าไฟฟ้ารอบบิลประจำเดือน"
-        },
-        {
-            "doc_type": "bank_slip", "transaction_date": (now - timedelta(days=3)).strftime("%Y-%m-%d"),
-            "transaction_time": "14:10:00", "type": "income", "amount": 25000.0, "fee": 0.0,
-            "category": "รายรับและเงินโอนเข้า", "subcategory": "รับเงินโอนค่าบริการ", "payment_source": "กสิกรไทย (KBank)",
-            "payee_name": "คุณผู้ใช้", "sender_name": "บริษัท คู่ค้า จำกัด",
-            "ref_number": f"2026{now.strftime('%m%d')}KB88", "notes": "รับชำระค่าบริการพัฒนาระบบ งวดที่ 1"
-        }
-    ]
 
-    for item in sample_data:
-        audited = audit_and_recheck_transaction(item)
-        insert_transaction(audited)
-
-    return jsonify({"status": "seeded", "count": len(sample_data), "message": f"Successfully seeded {len(sample_data)} demo transactions."})
 
 @app.route("/api/clear-all", methods=["POST"])
 def clear_all_transactions():
