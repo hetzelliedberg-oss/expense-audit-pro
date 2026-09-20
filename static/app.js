@@ -81,13 +81,6 @@ async function uploadBatchFiles(fileList) {
   const files = Array.from(fileList);
   if (files.length === 0) return;
 
-  const hasKey = await checkSettings();
-  if (!hasKey) {
-    alert("กรุณาระบุ Google Gemini API Key ที่เมนู 'ตั้งค่า' ก่อนเริ่มอัปโหลด เพื่อให้ระบบดึงข้อมูลจริง (Facts Only) จากภาพสลิปครับ");
-    openSettingsModal();
-    return;
-  }
-
   const progressContainer = document.getElementById("batchProgressContainer");
   const progressBar = document.getElementById("batchProgressBar");
   const progressLabel = document.getElementById("batchProgressLabel");

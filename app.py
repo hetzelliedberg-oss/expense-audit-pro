@@ -89,8 +89,28 @@ def upload_files():
         "status": "queued",
         "batch_id": batch_id,
         "total_files": len(saved_file_tuples),
-        "message": f"Enqueued {len(saved_file_tuples)} files for background AI processing."
+        "message": f"Enqueued {len(saved_file_tuples)} files for AI processing."
     })
+
+@app.route("/api/pending-files", methods=["GET"])
+def list_pending_files():
+    """Lists uploaded files waiting to be audited."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT file_path, file_name FROM transactions;")
+    existing_files = set(r["file_name"] for r in c.fetchall())
+    conn.close()
+
+    pending = []
+    for p in UPLOAD_FOLDER.glob("*.*"):
+        if p.name not in existing_files and p.suffix.lower().replace(".", "") in ALLOWED_EXTENSIONS:
+            pending.append({
+                "filename": p.name,
+                "path": str(p),
+                "url": f"/uploads/{p.name}",
+                "size_bytes": p.stat().st_size
+            })
+    return jsonify({"pending": pending, "count": len(pending)})
 
 def datetime_stamp():
     from datetime import datetime
