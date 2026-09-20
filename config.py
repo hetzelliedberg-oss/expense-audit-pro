@@ -31,5 +31,8 @@ HOST = os.environ.get("HOST", "0.0.0.0")
 
 # Batch upload settings
 MAX_WORKER_THREADS = 5
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "pdf"}
+ALLOWED_EXTENSIONS = {
+    "png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif",
+    "pdf", "heic", "heif", "jfif", "avif", "raw", "dng"
+}
 MAX_CONTENT_LENGTH = 1024 * 1024 * 1024  # 1 GB max per batch request

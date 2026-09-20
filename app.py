@@ -38,8 +38,36 @@ CORS(app)
 # Initialize SQLite database
 init_db()
 
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+def is_allowed_file(f):
+    if not f or not f.filename:
+        return False
+    fname = os.path.basename(f.filename).strip()
+    if "." in fname:
+        ext = fname.rsplit(".", 1)[1].lower()
+        if ext in ALLOWED_EXTENSIONS:
+            return True
+    ctype = (f.content_type or getattr(f, "mimetype", "") or "").lower()
+    if ctype.startswith("image/") or ctype in ["application/pdf", "application/octet-stream"]:
+        return True
+    return False
+
+def get_safe_filename(f):
+    fname = os.path.basename(f.filename or "").strip()
+    if not fname:
+        fname = f"upload_{uuid.uuid4().hex[:6]}"
+    if "." not in fname:
+        ctype = (f.content_type or getattr(f, "mimetype", "") or "").lower()
+        if "png" in ctype:
+            fname += ".png"
+        elif "pdf" in ctype:
+            fname += ".pdf"
+        elif "webp" in ctype:
+            fname += ".webp"
+        elif "gif" in ctype:
+            fname += ".gif"
+        else:
+            fname += ".jpg"
+    return fname
 
 # ----------------------------------------------------
 # Static and Upload File Serving
@@ -61,24 +89,26 @@ def upload_files():
     Accepts unlimited batch image files (e.g. 50, 100, 200+ images in one request).
     Saves them to disk and dispatches to background queue workers immediately.
     """
-    if "files" not in request.files:
-        return jsonify({"error": "No files provided"}), 400
-
+    # Accept files under any field name (files, file, images, or direct list)
     files = request.files.getlist("files")
-    if not files or files[0].filename == "":
-        return jsonify({"error": "Empty file list"}), 400
+    if not files:
+        for key in request.files:
+            files.extend(request.files.getlist(key))
+
+    if not files:
+        return jsonify({"error": "No files provided in request"}), 400
 
     batch_name = request.form.get("batch_name", f"Batch {datetime_stamp()}")
     saved_file_tuples = []
 
     for f in files:
-        if f and allowed_file(f.filename):
-            orig_name = f.filename
-            ext = orig_name.rsplit(".", 1)[1].lower()
+        if f and (f.filename or getattr(f, "name", "")):
+            orig_name = get_safe_filename(f)
             unique_name = f"{uuid.uuid4().hex[:12]}_{orig_name}"
             dest_path = UPLOAD_FOLDER / unique_name
             f.save(str(dest_path))
             saved_file_tuples.append((orig_name, str(dest_path)))
+            print(f"[Upload] Successfully saved incoming file: {orig_name} -> {unique_name}")
 
     if not saved_file_tuples:
         return jsonify({"error": "No valid image files found"}), 400

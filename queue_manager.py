@@ -1,3 +1,4 @@
+import os
 import time
 import uuid
 import logging
@@ -26,8 +27,49 @@ def process_single_image(batch_id: str, file_name: str, file_path: str):
         # Step 1: Compute File Hash for exact duplicate image detection
         f_hash = compute_file_hash(file_path)
 
-        # Step 2: Real Gemini AI Multimodal Vision Extraction
-        extracted_result = extract_with_gemini(file_path)
+        # Step 2: Check if background API key is set; if not, queue for Gemini 3.8 Flash
+        from database import get_setting
+        from datetime import datetime
+        api_key = get_setting("api_key", "") or os.environ.get("GEMINI_API_KEY", "")
+
+        if not api_key:
+            # Seamless mode: save document and prepare for Gemini 3.8 Flash audit
+            tx_data = {
+                "batch_id": batch_id,
+                "file_name": file_name,
+                "file_path": file_path,
+                "file_hash": f_hash,
+                "doc_type": "bank_slip",
+                "transaction_date": datetime.now().strftime("%Y-%m-%d"),
+                "transaction_time": datetime.now().strftime("%H:%M:%S"),
+                "transaction_datetime": datetime.now().isoformat(),
+                "type": "expense",
+                "amount": 0.0,
+                "fee": 0.0,
+                "vat": 0.0,
+                "total_amount": 0.0,
+                "category": "รอสแกน",
+                "subcategory": "",
+                "payment_source": "",
+                "sender_name": "",
+                "sender_account": "",
+                "payee_name": file_name,
+                "payee_account": "",
+                "ref_number": "",
+                "items": [],
+                "confidence_score": 1.0,
+                "notes": "อัปโหลดสำเร็จแล้ว พร้อมให้ Gemini 3.8 Flash สแกนยอดจริง",
+                "audit_status": "pending_audit",
+                "audit_note": "พร้อมให้ Gemini 3.8 Flash ทำการ Audit และแยกค่าใช้จ่าย",
+                "raw_ai_response": ""
+            }
+            trans_id = insert_transaction(tx_data)
+            update_batch_progress(batch_id, processed_increment=1)
+            logger.info(f"Batch {batch_id}: Enqueued {file_name} as Tx #{trans_id} (Ready for Gemini 3.8 Flash)")
+            return
+
+        # Real Gemini AI Multimodal Vision Extraction (if API key configured)
+        extracted_result = extract_with_gemini(file_path, api_key=api_key)
         tx_list = extracted_result.get("transactions", [])
         
         if not tx_list:
