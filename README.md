@@ -10,6 +10,10 @@ pinned: false
 
 # 💎 ExpenseAudit Pro: ระบบหลังบ้านอัจฉริยะ ตรวจสอบและแยกค่าใช้จ่ายทางการเงิน
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/hetzelliedberg-oss/expense-audit-pro)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/hetzelliedberg-oss/expense-audit-pro)
+[![Deploy to Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?type=git&repository=hetzelliedberg-oss/expense-audit-pro&branch=main)
+
 ระบบ Web Back-Office สำหรับคัดแยกและตรวจสอบค่าใช้จ่ายจากภาพสลิปโอนเงินธนาคารไทย, บิลบัตรเครดิต, ใบเสร็จรับเงิน (7-Eleven, Makro, Lotus, ปั๊มน้ำมัน) และสเตทเม้นท์ รองรับการ **อัปโหลดภาพแบบไม่อั้น (100–200+ รูปในคลิกเดียว)** พร้อมระบบ **Audit & Recheck ตรวจจับสลิปซ้ำ** และส่งออกรายงานสรุป Excel/CSV แบบมืออาชีพ
 
 ---
